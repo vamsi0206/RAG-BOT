@@ -1,0 +1,35 @@
+Artificial Intelligence at Ericsson
+
+Ericsson is a Swedish multinational networking and telecommunications company headquartered in Stockholm. The company was founded in 1876 by Lars Magnus Ericsson. Today, Ericsson employs approximately 100,000 people worldwide and operates in more than 180 countries.
+
+5G and AI Integration
+
+Ericsson is at the forefront of integrating artificial intelligence into 5G networks. Their AI-powered network optimization platform uses machine learning to predict network congestion, automatically allocate resources, and reduce energy consumption by up to 15%. The company has deployed AI-driven solutions in over 50 countries.
+
+Research and Development
+
+Ericsson invests approximately 20% of its revenue in research and development. The company holds over 60,000 patents globally. Their AI research focuses on three main areas: network automation, predictive maintenance, and energy efficiency. Ericsson's AI lab in Bangalore, India works on developing next-generation machine learning models for telecom applications.
+
+Cloud and Edge Computing
+
+Ericsson's cloud-native solutions enable telecom operators to run AI workloads at the edge of the network. This reduces latency from 50ms to under 5ms, enabling real-time applications like autonomous vehicles and remote surgery. Their Edge AI platform processes data locally without sending it to the cloud, improving both speed and privacy.
+
+Sustainability Goals
+
+Ericsson aims to reach net-zero emissions across its entire value chain by 2040. AI plays a crucial role in this goal — their intelligent network management system reduces energy consumption by optimizing base station sleep cycles and antenna tilting based on real-time traffic patterns.
+
+Partnerships and Ecosystem
+
+Ericsson collaborates with over 30 universities worldwide on AI research. Key partners include MIT, KTH Royal Institute of Technology, and IIT Hyderabad. The company also runs an AI accelerator program that has supported over 100 startups in the telecom AI space.
+
+Products and Services
+
+Key AI-powered products include:
+- Ericsson Intelligent Automation Platform: Automates network operations using AI
+- Ericsson Energy Intelligence: Reduces energy costs by 20-30% using ML
+- Ericsson Cognitive Network: Self-healing network that detects and fixes faults automatically
+- Ericsson Security AI: Detects and responds to network threats in real-time
+
+Career Opportunities
+
+Ericsson regularly hires AI and machine learning engineers. Required skills include Python, TensorFlow or PyTorch, cloud computing (AWS/Azure), and knowledge of telecommunications. The company offers graduate programs and internships focused on AI and data science.
