@@ -114,39 +114,86 @@ Answer:"""
     return response.choices[0].message.content
 
 
+# --- LOAD ALL DOCUMENTS FROM A FOLDER ---
+# Scans the folder and loads every .pdf and .txt file
+
+def load_all_documents(folder_path):
+    """Load all documents from a folder. Returns list of (filename, text) pairs."""
+    documents = []
+
+    # Loop through every file in the folder
+    for filename in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, filename)
+
+        # Only process .pdf and .txt files
+        if filename.endswith(".pdf") or filename.endswith(".txt"):
+            try:
+                text = load_document(file_path)
+                documents.append((filename, text))
+                print(f"      ✅ Loaded: {filename}")
+            except Exception as e:
+                print(f"      ❌ Failed: {filename} ({e})")
+
+    return documents
+
+
+# --- CHUNK ALL DOCUMENTS ---
+# Chunks every document and tracks which file each chunk came from
+
+def chunk_all_documents(documents, chunk_size=200, overlap=30):
+    """Chunk all documents. Returns (chunks_list, sources_list).
+    sources_list tracks which file each chunk belongs to."""
+    all_chunks = []
+    all_sources = []
+
+    for filename, text in documents:
+        chunks = chunk_text(text, chunk_size, overlap)
+        all_chunks.extend(chunks)
+        # Track the source file for each chunk
+        all_sources.extend([filename] * len(chunks))
+
+    return all_chunks, all_sources
+
+
 # --- MAIN FUNCTION ---
 # Ties everything together
 
 def main():
     print("=" * 50)
     print("  DOCUMENT Q&A BOT (RAG)")
+    print("  Loads ALL documents from documents/ folder")
     print("  Type 'quit' to exit")
     print("=" * 50)
 
-    # Ask user for the document path
-    file_path = input("\nEnter document path (e.g., documents/sample.txt): ")
+    folder_path = "documents"
 
-    # Check if file exists
-    if not os.path.exists(file_path):
-        print(f"Error: File '{file_path}' not found!")
+    # Check if folder exists
+    if not os.path.exists(folder_path):
+        print(f"Error: Folder '{folder_path}' not found!")
         return
 
-    # STEP 1: Load the document
-    print("\n[1/3] Loading document...")
-    text = load_document(file_path)
-    print(f"      Loaded {len(text.split())} words")
+    # STEP 1: Load all documents from the folder
+    print("\n[1/3] Loading documents...")
+    documents = load_all_documents(folder_path)
 
-    # STEP 2: Chunk the document
-    print("[2/3] Chunking document...")
-    chunks = chunk_text(text)
-    print(f"      Created {len(chunks)} chunks")
+    if not documents:
+        print("      No .pdf or .txt files found in documents/ folder!")
+        return
 
-    # STEP 3: Embed all chunks (this is the "setup" phase)
-    print("[3/3] Creating embeddings...")
+    total_words = sum(len(text.split()) for _, text in documents)
+    print(f"      Total: {len(documents)} files, {total_words} words")
+
+    # STEP 2: Chunk all documents
+    print("\n[2/3] Chunking documents...")
+    chunks, sources = chunk_all_documents(documents)
+    print(f"      Created {len(chunks)} chunks from {len(documents)} files")
+
+    # STEP 3: Embed all chunks
+    print("\n[3/3] Creating embeddings...")
     embeddings = embed_chunks(chunks)
     print(f"      Created {len(embeddings)} embeddings")
 
-    print("\n✅ Ready! Ask questions about your document.\n")
+    print("\n✅ Ready! Ask questions about your documents.\n")
 
     # QUERY LOOP: Keep asking questions
     while True:
