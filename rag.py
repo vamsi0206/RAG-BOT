@@ -68,7 +68,7 @@ def embed_chunks(chunks):
 # --- PART 4: SEARCH FOR RELEVANT CHUNKS ---
 # Given a question, find the most similar chunks
 
-def find_similar_chunks(question, chunks, embeddings, top_k=3):
+def find_similar_chunks(question, chunks, sources, embeddings, top_k=3):
     # Step 1: Convert question to a vector
     question_embedding = embedding_model.encode([question])[0]
 
@@ -81,8 +81,11 @@ def find_similar_chunks(question, chunks, embeddings, top_k=3):
     # [::-1] reverses it so highest similarity comes first
     top_indices = np.argsort(similarities)[-top_k:][::-1]
 
-    # Step 4: Return the actual text of those chunks
-    return [chunks[i] for i in top_indices]
+    # Step 4: Return the chunks AND their source filenames
+    relevant_chunks = [chunks[i] for i in top_indices]
+    relevant_sources = [sources[i] for i in top_indices]
+
+    return relevant_chunks, relevant_sources
 
 
 # --- PART 5: GENERATE ANSWER ---
@@ -207,12 +210,16 @@ def main():
             continue
 
         # Find relevant chunks
-        relevant_chunks = find_similar_chunks(question, chunks, embeddings)
+        relevant_chunks, relevant_sources = find_similar_chunks(question, chunks, sources, embeddings)
 
         # Generate answer using LLM
         answer = ask(question, relevant_chunks)
 
-        print(f"\nAssistant: {answer}\n")
+        print(f"\nAssistant: {answer}")
+
+        # Show which documents the answer came from
+        unique_sources = list(set(relevant_sources))
+        print(f"\n📄 Sources: {', '.join(unique_sources)}\n")
 
 
 # --- RUN ---
