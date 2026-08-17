@@ -1,6 +1,10 @@
+"""
+RAG Engine — Retrieval-Augmented Generation Pipeline
+=====================================================
+Core module for document ingestion, semantic search, and LLM-powered Q&A.
+Supports PDF and text files with multi-document loading and source tracking.
+"""
 
-
-# --- IMPORTS ---
 import os
 import numpy as np
 from dotenv import load_dotenv
@@ -8,220 +12,238 @@ from groq import Groq
 from sentence_transformers import SentenceTransformer
 from PyPDF2 import PdfReader
 
-
-# --- SETUP ---
+# --- CONFIGURATION ---
 load_dotenv()
+
+EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
+LLM_MODEL = "llama-3.3-70b-versatile"
+CHUNK_SIZE = 200
+CHUNK_OVERLAP = 30
+TOP_K_RESULTS = 3
+LLM_TEMPERATURE = 0.3
+LLM_MAX_TOKENS = 1024
+SUPPORTED_EXTENSIONS = (".pdf", ".txt")
+
+# --- INITIALIZE CLIENTS ---
 client = Groq()
-
-# Load the embedding model (runs locally on your machine)
-# "all-MiniLM-L6-v2" converts any text into a vector of 384 numbers
-print("Loading embedding model...")
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-print("Model loaded!\n")
+print(f"[RAG] Loading embedding model: {EMBEDDING_MODEL_NAME}...")
+embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+print("[RAG] Model loaded ✅\n")
 
 
-# --- PART 1: LOAD DOCUMENT ---
-# Reads a PDF or text file and returns all the text as one string
+# ============================================================
+# DOCUMENT LOADING
+# ============================================================
 
-def load_document(file_path):
+def load_document(file_path: str) -> str:
+    """Load a single document (PDF or text) and return its content as a string."""
     if file_path.endswith(".pdf"):
-        # Read PDF: go through each page and extract text
         reader = PdfReader(file_path)
-        text = ""
-        for page in reader.pages:
-            text += page.extract_text()
+        text = "".join(page.extract_text() or "" for page in reader.pages)
     else:
-        # Read text file: just open and read everything
-        with open(file_path, "r") as f:
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
             text = f.read()
     return text
 
 
-# --- PART 2: CHUNK THE TEXT ---
-# Split the document into smaller pieces
-# chunk_size = how many words per chunk
-# overlap = how many words shared between consecutive chunks
+def load_all_documents(folder_path: str) -> list[tuple[str, str]]:
+    """
+    Load all supported documents from a folder.
+    Returns: list of (filename, text_content) tuples.
+    """
+    if not os.path.exists(folder_path):
+        raise FileNotFoundError(f"Documents folder not found: {folder_path}")
 
-def chunk_text(text, chunk_size=200, overlap=30):
-    words = text.split()              # Split text into list of words
-    chunks = []                        # Empty list to store chunks
-
-    # Loop through words, stepping by (chunk_size - overlap)
-    for i in range(0, len(words), chunk_size - overlap):
-        # Take 'chunk_size' words starting from position i
-        chunk = " ".join(words[i:i + chunk_size])
-        chunks.append(chunk)
-
-    return chunks
-
-
-# --- PART 3: EMBED THE CHUNKS ---
-# Convert each chunk into a vector (array of 384 numbers)
-# This is done ONCE when the document is loaded
-
-def embed_chunks(chunks):
-    # .encode() takes a list of strings and returns a list of vectors
-    embeddings = embedding_model.encode(chunks)
-    return embeddings
-
-
-# --- PART 4: SEARCH FOR RELEVANT CHUNKS ---
-# Given a question, find the most similar chunks
-
-def find_similar_chunks(question, chunks, sources, embeddings, top_k=3):
-    # Step 1: Convert question to a vector
-    question_embedding = embedding_model.encode([question])[0]
-
-    # Step 2: Calculate similarity between question and every chunk
-    # np.dot = dot product (higher number = more similar)
-    similarities = np.dot(embeddings, question_embedding)
-
-    # Step 3: Get indices of top_k most similar chunks
-    # argsort gives indices from lowest to highest, so we take the last 'top_k'
-    # [::-1] reverses it so highest similarity comes first
-    top_indices = np.argsort(similarities)[-top_k:][::-1]
-
-    # Step 4: Return the chunks AND their source filenames
-    relevant_chunks = [chunks[i] for i in top_indices]
-    relevant_sources = [sources[i] for i in top_indices]
-
-    return relevant_chunks, relevant_sources
-
-
-# --- PART 5: GENERATE ANSWER ---
-# Send the relevant chunks + question to the LLM
-
-def ask(question, relevant_chunks):
-    # Join the chunks into one context string
-    context = "\n\n".join(relevant_chunks)
-
-    # Build the prompt — tell the LLM to only use provided information
-    prompt = f"""Based on the following information, answer the question.
-If the answer is not in the provided information, say "I don't have enough information to answer that."
-
-Information:
-{context}
-
-Question: {question}
-
-Answer:"""
-
-    # Send to Groq
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.3,       # Low temperature = factual, less creative
-        max_tokens=1024
-    )
-
-    return response.choices[0].message.content
-
-
-# --- LOAD ALL DOCUMENTS FROM A FOLDER ---
-# Scans the folder and loads every .pdf and .txt file
-
-def load_all_documents(folder_path):
-    """Load all documents from a folder. Returns list of (filename, text) pairs."""
     documents = []
+    for filename in sorted(os.listdir(folder_path)):
+        if not filename.endswith(SUPPORTED_EXTENSIONS):
+            continue
 
-    # Loop through every file in the folder
-    for filename in os.listdir(folder_path):
         file_path = os.path.join(folder_path, filename)
-
-        # Only process .pdf and .txt files
-        if filename.endswith(".pdf") or filename.endswith(".txt"):
-            try:
-                text = load_document(file_path)
+        try:
+            text = load_document(file_path)
+            if text.strip():
                 documents.append((filename, text))
-                print(f"      ✅ Loaded: {filename}")
-            except Exception as e:
-                print(f"      ❌ Failed: {filename} ({e})")
+                print(f"  ✅ {filename} ({len(text.split())} words)")
+            else:
+                print(f"  ⚠️  {filename} (empty, skipped)")
+        except Exception as e:
+            print(f"  ❌ {filename} — {e}")
 
     return documents
 
 
-# --- CHUNK ALL DOCUMENTS ---
-# Chunks every document and tracks which file each chunk came from
+# ============================================================
+# CHUNKING
+# ============================================================
 
-def chunk_all_documents(documents, chunk_size=200, overlap=30):
-    """Chunk all documents. Returns (chunks_list, sources_list).
-    sources_list tracks which file each chunk belongs to."""
+def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
+    """Split text into overlapping chunks of approximately `chunk_size` words."""
+    words = text.split()
+    if not words:
+        return []
+
+    chunks = []
+    step = chunk_size - overlap
+
+    for i in range(0, len(words), step):
+        chunk = " ".join(words[i:i + chunk_size])
+        if chunk.strip():
+            chunks.append(chunk)
+
+    return chunks
+
+
+def chunk_all_documents(
+    documents: list[tuple[str, str]],
+    chunk_size: int = CHUNK_SIZE,
+    overlap: int = CHUNK_OVERLAP
+) -> tuple[list[str], list[str]]:
+    """
+    Chunk all documents with source tracking.
+    Returns: (all_chunks, all_sources) where sources[i] = filename for chunks[i].
+    """
     all_chunks = []
     all_sources = []
 
     for filename, text in documents:
         chunks = chunk_text(text, chunk_size, overlap)
         all_chunks.extend(chunks)
-        # Track the source file for each chunk
         all_sources.extend([filename] * len(chunks))
 
     return all_chunks, all_sources
 
 
-# --- MAIN FUNCTION ---
-# Ties everything together
+# ============================================================
+# EMBEDDING & SEMANTIC SEARCH
+# ============================================================
+
+def embed_chunks(chunks: list[str]) -> np.ndarray:
+    """Convert text chunks into embedding vectors."""
+    if not chunks:
+        return np.array([])
+    return embedding_model.encode(chunks, show_progress_bar=False)
+
+
+def find_similar_chunks(
+    question: str,
+    chunks: list[str],
+    sources: list[str],
+    embeddings: np.ndarray,
+    top_k: int = TOP_K_RESULTS
+) -> tuple[list[str], list[str]]:
+    """
+    Find the most semantically similar chunks to a question.
+    Returns: (relevant_chunks, relevant_sources) sorted by similarity.
+    """
+    question_embedding = embedding_model.encode([question])[0]
+
+    # Cosine similarity via dot product (embeddings are normalized by default)
+    similarities = np.dot(embeddings, question_embedding)
+
+    # Get top-k indices sorted by highest similarity
+    top_indices = np.argsort(similarities)[-top_k:][::-1]
+
+    relevant_chunks = [chunks[i] for i in top_indices]
+    relevant_sources = [sources[i] for i in top_indices]
+
+    return relevant_chunks, relevant_sources
+
+
+# ============================================================
+# LLM GENERATION
+# ============================================================
+
+SYSTEM_PROMPT = """You are a precise document Q&A assistant. Answer questions ONLY using the provided context. 
+If the answer cannot be found in the context, say: "I don't have enough information to answer that."
+Be concise, accurate, and cite specific details from the context."""
+
+def ask(question: str, relevant_chunks: list[str]) -> str:
+    """Generate an answer using retrieved chunks as context."""
+    context = "\n\n---\n\n".join(relevant_chunks)
+
+    prompt = f"""Context:
+{context}
+
+---
+
+Question: {question}
+
+Answer based ONLY on the context above:"""
+
+    response = client.chat.completions.create(
+        model=LLM_MODEL,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=LLM_TEMPERATURE,
+        max_tokens=LLM_MAX_TOKENS,
+    )
+
+    return response.choices[0].message.content
+
+
+# ============================================================
+# CLI INTERFACE
+# ============================================================
 
 def main():
-    print("=" * 50)
-    print("  DOCUMENT Q&A BOT (RAG)")
-    print("  Loads ALL documents from documents/ folder")
-    print("  Type 'quit' to exit")
-    print("=" * 50)
+    """Run the RAG pipeline as a terminal application."""
+    print("=" * 55)
+    print("   📄 DOCUMENT Q&A — Retrieval-Augmented Generation")
+    print("=" * 55)
 
     folder_path = "documents"
 
-    # Check if folder exists
-    if not os.path.exists(folder_path):
-        print(f"Error: Folder '{folder_path}' not found!")
-        return
-
-    # STEP 1: Load all documents from the folder
+    # Load
     print("\n[1/3] Loading documents...")
     documents = load_all_documents(folder_path)
-
     if not documents:
-        print("      No .pdf or .txt files found in documents/ folder!")
+        print("No documents found. Add .pdf or .txt files to documents/ folder.")
         return
 
     total_words = sum(len(text.split()) for _, text in documents)
-    print(f"      Total: {len(documents)} files, {total_words} words")
+    print(f"\n  📊 {len(documents)} documents | {total_words:,} words total")
 
-    # STEP 2: Chunk all documents
-    print("\n[2/3] Chunking documents...")
+    # Chunk
+    print("\n[2/3] Chunking...")
     chunks, sources = chunk_all_documents(documents)
-    print(f"      Created {len(chunks)} chunks from {len(documents)} files")
+    print(f"  📊 {len(chunks)} chunks created")
 
-    # STEP 3: Embed all chunks
-    print("\n[3/3] Creating embeddings...")
+    # Embed
+    print("\n[3/3] Generating embeddings...")
     embeddings = embed_chunks(chunks)
-    print(f"      Created {len(embeddings)} embeddings")
+    print(f"  📊 {len(embeddings)} vectors generated")
 
-    print("\n✅ Ready! Ask questions about your documents.\n")
+    print("\n" + "=" * 55)
+    print("  ✅ Ready! Ask anything about your documents.")
+    print("  Type 'quit' to exit.")
+    print("=" * 55 + "\n")
 
-    # QUERY LOOP: Keep asking questions
+    # Query loop
     while True:
-        question = input("You: ")
+        question = input("You: ").strip()
 
-        if question.lower() == "quit":
+        if question.lower() in ("quit", "exit", "q"):
             print("\nGoodbye! 👋")
             break
 
-        if not question.strip():
+        if not question:
             continue
 
-        # Find relevant chunks
-        relevant_chunks, relevant_sources = find_similar_chunks(question, chunks, sources, embeddings)
-
-        # Generate answer using LLM
+        # Retrieve & Generate
+        relevant_chunks, relevant_sources = find_similar_chunks(
+            question, chunks, sources, embeddings
+        )
         answer = ask(question, relevant_chunks)
 
-        print(f"\nAssistant: {answer}")
+        # Display
+        print(f"\n🤖 {answer}")
+        unique_sources = list(dict.fromkeys(relevant_sources))  # preserves order
+        print(f"📄 Sources: {', '.join(unique_sources)}\n")
 
-        # Show which documents the answer came from
-        unique_sources = list(set(relevant_sources))
-        print(f"\n📄 Sources: {', '.join(unique_sources)}\n")
 
-
-# --- RUN ---
+# --- ENTRY POINT ---
 if __name__ == "__main__":
     main()

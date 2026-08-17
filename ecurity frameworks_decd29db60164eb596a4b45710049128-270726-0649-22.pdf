@@ -1,0 +1,52 @@
+[33mcommit 594f2e496c168575dee41b88050354c0a5c859c3[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: vamsi0206 <f20230018@hyderabad.bits-pilani.ac.in>
+Date:   Mon Jul 27 07:11:46 2026 +0000
+
+    source tracking available
+
+[1mdiff --git a/rag.py b/rag.py[m
+[1mindex 248b576..f372d53 100644[m
+[1m--- a/rag.py[m
+[1m+++ b/rag.py[m
+[36m@@ -68,7 +68,7 @@[m [mdef embed_chunks(chunks):[m
+ # --- PART 4: SEARCH FOR RELEVANT CHUNKS ---[m
+ # Given a question, find the most similar chunks[m
+ [m
+[31m-def find_similar_chunks(question, chunks, embeddings, top_k=3):[m
+[32m+[m[32mdef find_similar_chunks(question, chunks, sources, embeddings, top_k=3):[m
+     # Step 1: Convert question to a vector[m
+     question_embedding = embedding_model.encode([question])[0][m
+ [m
+[36m@@ -81,8 +81,11 @@[m [mdef find_similar_chunks(question, chunks, embeddings, top_k=3):[m
+     # [::-1] reverses it so highest similarity comes first[m
+     top_indices = np.argsort(similarities)[-top_k:][::-1][m
+ [m
+[31m-    # Step 4: Return the actual text of those chunks[m
+[31m-    return [chunks[i] for i in top_indices][m
+[32m+[m[32m    # Step 4: Return the chunks AND their source filenames[m
+[32m+[m[32m    relevant_chunks = [chunks[i] for i in top_indices][m
+[32m+[m[32m    relevant_sources = [sources[i] for i in top_indices][m
+[32m+[m
+[32m+[m[32m    return relevant_chunks, relevant_sources[m
+ [m
+ [m
+ # --- PART 5: GENERATE ANSWER ---[m
+[36m@@ -207,12 +210,16 @@[m [mdef main():[m
+             continue[m
+ [m
+         # Find relevant chunks[m
+[31m-        relevant_chunks = find_similar_chunks(question, chunks, embeddings)[m
+[32m+[m[32m        relevant_chunks, relevant_sources = find_similar_chunks(question, chunks, sources, embeddings)[m
+ [m
+         # Generate answer using LLM[m
+         answer = ask(question, relevant_chunks)[m
+ [m
+[31m-        print(f"\nAssistant: {answer}\n")[m
+[32m+[m[32m        print(f"\nAssistant: {answer}")[m
+[32m+[m
+[32m+[m[32m        # Show which documents the answer came from[m
+[32m+[m[32m        unique_sources = list(set(relevant_sources))[m
+[32m+[m[32m        print(f"\n📄 Sources: {', '.join(unique_sources)}\n")[m
+ [m
+ [m
+ # --- RUN ---[m

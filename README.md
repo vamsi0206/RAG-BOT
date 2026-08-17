@@ -1,32 +1,82 @@
 # Document Q&A Bot with RAG 📄🤖
 
-A Python-based document question-answering system using Retrieval-Augmented Generation (RAG). Ask questions about any PDF or text file and get accurate answers based only on the document's content.
+A production-ready document question-answering system using Retrieval-Augmented Generation (RAG). Ask questions about any PDF or text file and get accurate answers based only on the document's content.
+
+Available as **CLI**, **Web UI (Streamlit)**, and **REST API (FastAPI)**.
 
 ## What it does
 
-- Load any PDF or text document
+- Load any PDF or text documents
 - Ask questions in natural language
-- Gets answers **only from your document** (no hallucination)
+- Gets answers **only from your documents** (no hallucination)
+- Shows which document the answer came from (source tracking)
 - Uses local embeddings (free, no API cost for search)
-- Runs in your terminal
+- Multiple interfaces: Terminal, Web UI, API
 
 ## How it works (RAG Pipeline)
 
 ```
 SETUP (once):
-   Document → Split into chunks → Convert chunks to vectors → Store
+   Documents → Split into chunks → Convert to vectors → Store in memory
 
 QUERY (every question):
-   Question → Convert to vector → Find similar chunks → Send chunks + question to LLM → Answer
+   Question → Convert to vector → Find similar chunks → Send chunks + question to LLM → Answer + Sources
 ```
 
-### Step-by-step:
+## Three Ways to Use
 
-1. **Load** — Reads your PDF or text file
-2. **Chunk** — Splits the document into smaller pieces (~200 words each with overlap)
-3. **Embed** — Converts each chunk into a vector (array of 384 numbers) using a local AI model
-4. **Search** — When you ask a question, finds the 3 most relevant chunks using vector similarity
-5. **Generate** — Sends those chunks + your question to the LLM, which answers using only that information
+### 1. Terminal (CLI)
+
+```bash
+cd ~/rag-chatbot && python3 rag.py
+```
+
+Interactive terminal chat — type questions, get answers.
+
+### 2. Web UI (Streamlit)
+
+```bash
+cd ~/rag-chatbot && streamlit run streamlit_app.py
+```
+
+Opens a ChatGPT-like web interface at `http://localhost:8501`
+
+Features:
+- Chat interface with message history
+- Sidebar showing loaded documents
+- Source citations on every answer
+- Cached document loading (fast after first load)
+
+### 3. REST API (FastAPI)
+
+```bash
+cd ~/rag-chatbot && uvicorn rag_api:app --reload
+```
+
+API available at `http://localhost:8000`
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/` | GET | Health check |
+| `/documents` | GET | List loaded documents |
+| `/ask` | POST | Ask a question, get answer + sources |
+
+Example API call:
+```bash
+curl -X POST http://localhost:8000/ask \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What does Ericsson do?"}'
+```
+
+Response:
+```json
+{
+  "answer": "Ericsson is a Swedish multinational networking and telecommunications company...",
+  "sources": ["archvision.pdf"]
+}
+```
+
+Interactive API docs: `http://localhost:8000/docs`
 
 ## Tech Stack
 
@@ -37,6 +87,8 @@ QUERY (every question):
 | sentence-transformers | Local embedding model (all-MiniLM-L6-v2) |
 | NumPy | Vector similarity calculation |
 | PyPDF2 | PDF reading |
+| FastAPI | REST API framework |
+| Streamlit | Web UI framework |
 | python-dotenv | Environment variable management |
 
 ## Setup
@@ -59,19 +111,13 @@ cd RAG-BOT
 pip install -r requirements.txt
 ```
 
-If that doesn't work, try:
-
-```bash
-pip3 install -r requirements.txt
-```
-
 Or:
 
 ```bash
 python3 -m pip install -r requirements.txt
 ```
 
-**Note:** First install takes a few minutes — it downloads PyTorch and the embedding model.
+**Note:** First install takes a few minutes — downloads PyTorch and the embedding model.
 
 ### Step 3: Get your API key (free)
 
@@ -86,99 +132,114 @@ python3 -m pip install -r requirements.txt
 echo "GROQ_API_KEY=your_key_here" > .env
 ```
 
-Replace `your_key_here` with your actual API key.
+### Step 5: Add documents
 
-### Step 5: Run it
+Put any `.pdf` or `.txt` files in the `documents/` folder:
 
 ```bash
+cp your-file.pdf documents/
+```
+
+### Step 6: Run
+
+```bash
+# Terminal
 python3 rag.py
-```
 
-It will ask for a document path. Try the included sample:
+# Web UI
+streamlit run streamlit_app.py
 
-```
-Enter document path: documents/sample.txt
-```
-
-Then ask questions!
-
-## Example
-
-```
-==================================================
-  DOCUMENT Q&A BOT (RAG)
-  Type 'quit' to exit
-==================================================
-
-Enter document path (e.g., documents/sample.txt): documents/sample.txt
-
-[1/3] Loading document...
-      Loaded 512 words
-[2/3] Chunking document...
-      Created 4 chunks
-[3/3] Creating embeddings...
-      Created 4 embeddings
-
-✅ Ready! Ask questions about your document.
-
-You: How much does Ericsson invest in R&D?
-Assistant: Ericsson invests approximately 20% of its revenue in research and development.
-
-You: Which universities does Ericsson partner with?
-Assistant: Ericsson collaborates with MIT, KTH Royal Institute of Technology, and IIT Hyderabad.
-
-You: What is the population of India?
-Assistant: I don't have enough information to answer that.
-
-You: quit
-Goodbye! 👋
+# API
+uvicorn rag_api:app --reload
 ```
 
 ## Project Structure
 
 ```
 RAG-BOT/
-├── rag.py              ← main RAG pipeline code
-├── documents/          ← put your PDFs or text files here
-│   └── sample.txt      ← included sample document
-├── requirements.txt    ← Python packages needed
+├── rag.py              ← core RAG engine (loading, chunking, embedding, search, generation)
+├── streamlit_app.py    ← web UI (Streamlit)
+├── rag_api.py          ← REST API (FastAPI)
+├── example_api.py      ← API reference example
+├── documents/          ← put your PDFs and text files here
+│   ├── archvision.pdf
+│   ├── sample.txt
+│   └── ...
+├── requirements.txt    ← Python packages
 ├── .env                ← your API key (NOT pushed to GitHub)
-├── .gitignore          ← tells git to ignore .env
+├── .gitignore          ← ignores .env
 └── README.md           ← this file
 ```
 
-## Using your own documents
+## Architecture
 
-1. Put any `.txt` or `.pdf` file in the `documents/` folder
-2. Run `python3 rag.py`
-3. Enter the path: `documents/your-file.pdf`
-4. Ask questions!
+```
+┌──────────────────────────────────────────────────┐
+│                   INTERFACES                      │
+├────────────┬─────────────────┬───────────────────┤
+│  Terminal  │   Streamlit UI  │    FastAPI REST    │
+│  (rag.py)  │(streamlit_app.py)│   (rag_api.py)   │
+└─────┬──────┴────────┬────────┴──────────┬────────┘
+      │               │                   │
+      └───────────────┼───────────────────┘
+                      │
+         ┌────────────▼────────────┐
+         │     RAG ENGINE (rag.py) │
+         ├─────────────────────────┤
+         │  load_all_documents()   │
+         │  chunk_all_documents()  │
+         │  embed_chunks()         │
+         │  find_similar_chunks()  │
+         │  ask()                  │
+         └────────────┬────────────┘
+                      │
+         ┌────────────▼────────────┐
+         │       EXTERNAL SERVICES  │
+         ├──────────────────────────┤
+         │  Groq API (LLM)         │
+         │  SentenceTransformers   │
+         │  (local embeddings)     │
+         └──────────────────────────┘
+```
 
-## Key Concepts Covered
+## Key Concepts
 
 | Concept | Description |
 |---------|-------------|
-| RAG | Retrieval-Augmented Generation — search first, then answer |
-| Embeddings | Converting text to vectors (numbers) for semantic search |
-| Chunking | Splitting documents into searchable pieces |
-| Vector Similarity | Finding relevant information using dot product |
-| Prompt Engineering | Instructing the LLM to only use provided context |
-| Hallucination Prevention | LLM says "I don't know" when info isn't in the document |
+| RAG | Retrieve relevant info first, then generate answer |
+| Embeddings | Converting text to vectors for semantic search |
+| Chunking | Splitting documents into searchable pieces (200 words, 30 word overlap) |
+| Vector Similarity | Finding relevant chunks using dot product |
+| Source Tracking | Every chunk knows which file it came from |
+| Prompt Engineering | LLM instructed to only use provided context |
+
+## Configuration
+
+Edit the top of `rag.py` to customize:
+
+```python
+EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"    # embedding model
+LLM_MODEL = "llama-3.3-70b-versatile"         # LLM model
+CHUNK_SIZE = 200                               # words per chunk
+CHUNK_OVERLAP = 30                             # overlap between chunks
+TOP_K_RESULTS = 3                              # number of chunks retrieved
+LLM_TEMPERATURE = 0.3                          # lower = more factual
+```
 
 ## Limitations
 
-- Memory resets when you restart (chunks are not stored permanently)
+- Documents re-embedded on every server restart (no persistent vector store)
 - Large PDFs take longer to embed
-- Token limit means very long chunks might get truncated
-- No conversation memory (each question is independent)
+- Token limit means very long chunks may get truncated
+- No conversation memory in API mode (each question is independent)
 
 ## Future Improvements
 
-- Add a vector database (ChromaDB/FAISS) for persistent storage
+- Add ChromaDB/FAISS for persistent vector storage
 - Add conversation memory (follow-up questions)
-- Web UI with Streamlit or Gradio
-- Support for multiple documents at once
-- Advanced chunking (by sections/paragraphs instead of word count)
+- File upload via Streamlit UI
+- Authentication for the API
+- Deploy to cloud (Railway/Render)
 
 ## Built by
 
