@@ -179,6 +179,7 @@ Answer based ONLY on the context above:"""
         ],
         temperature=LLM_TEMPERATURE,
         max_tokens=LLM_MAX_TOKENS,
+        timeout=45.0, 
     )
 
     return response.choices[0].message.content
