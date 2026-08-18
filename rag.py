@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from groq import Groq
 from sentence_transformers import SentenceTransformer
 from PyPDF2 import PdfReader
+import streamlit as st
 
 # --- CONFIGURATION ---
 load_dotenv()
@@ -171,6 +172,7 @@ Question: {question}
 
 Answer based ONLY on the context above:"""
 
+try:
     response = client.chat.completions.create(
         model=LLM_MODEL,
         messages=[
@@ -182,8 +184,19 @@ Answer based ONLY on the context above:"""
         timeout=45.0, 
     )
 
-    return response.choices[0].message.content
+    answer = response.choices[0].message.content
 
+except groq.APIConnectionError as e:
+    # Captures the network-level breakdown reason
+    st.error("⚠️ Connection Error: The application could not reach the Groq API servers.")
+    print(f"❌ CRITICAL CONNECTION ERROR DETAIL: {e.__cause__}")
+    answer = "Network timeout. Please narrow your query or try again."
+
+except groq.APIStatusError as e:
+    # Captures bad variables like expired keys or invalid model strings
+    st.error(f"⚠️ Groq API returned status code {e.status_code}")
+    print(f"❌ API STATUS ERROR BODY: {e.response.json()}")
+    answer = f"API Error: {e.status_code}"
 
 # ============================================================
 # CLI INTERFACE
