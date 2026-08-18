@@ -9,6 +9,7 @@ import os
 import numpy as np
 from dotenv import load_dotenv
 from groq import Groq
+import groq
 from sentence_transformers import SentenceTransformer
 from PyPDF2 import PdfReader
 import streamlit as st
@@ -168,35 +169,26 @@ def ask(question: str, relevant_chunks: list[str]) -> str:
 
 ---
 
-Question: {question}
+Question: {question} 
 
 Answer based ONLY on the context above:"""
 
-try:
-    response = client.chat.completions.create(
-        model=LLM_MODEL,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=LLM_TEMPERATURE,
-        max_tokens=LLM_MAX_TOKENS,
-        timeout=45.0, 
-    )
+    try:
+        response = client.chat.completions.create(
+            model=LLM_MODEL,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt}                         
+            ],                                                              
+            temperature=LLM_TEMPERATURE,                                    
+            max_tokens=LLM_MAX_TOKENS,
+        )
+        return response.choices[0].message.content
 
-    answer = response.choices[0].message.content
-
-except groq.APIConnectionError as e:
-    # Captures the network-level breakdown reason
-    st.error("⚠️ Connection Error: The application could not reach the Groq API servers.")
-    print(f"❌ CRITICAL CONNECTION ERROR DETAIL: {e.__cause__}")
-    answer = "Network timeout. Please narrow your query or try again."
-
-except groq.APIStatusError as e:
-    # Captures bad variables like expired keys or invalid model strings
-    st.error(f"⚠️ Groq API returned status code {e.status_code}")
-    print(f"❌ API STATUS ERROR BODY: {e.response.json()}")
-    answer = f"API Error: {e.status_code}"
+    except groq.APIConnectionError as e:                                    
+        st.error("⚠️ Connection Error: Could not reach the Groq API.")  
+        print(f"❌ CRITICAL CONNECTION ERROR DETAIL: {e.__cause__}")
+        return "Error: Could not retrieve answer due to connection issues."
 
 # ============================================================
 # CLI INTERFACE
