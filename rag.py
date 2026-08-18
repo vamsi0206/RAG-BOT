@@ -16,7 +16,7 @@ from PyPDF2 import PdfReader
 load_dotenv()
 
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
-LLM_MODEL = "llama-3.3-70b-versatile"
+LLM_MODEL = "openai/gpt-oss-120b"
 CHUNK_SIZE = 200
 CHUNK_OVERLAP = 30
 TOP_K_RESULTS = 3
