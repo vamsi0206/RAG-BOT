@@ -1,2 +1,2 @@
 [tool.vercel]
-entrypoint = "rag_api.py"
+entrypoint = "rag_api:app"
